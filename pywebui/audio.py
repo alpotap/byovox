@@ -230,12 +230,12 @@ def extract_speech_parts(
         # - highpass: remove low-frequency rumble, hum, wind noise (80 Hz cutoff)
         # - lowpass: remove high-frequency hiss, noise (8 kHz cutoff)
         # - compand: compress dynamic range (boost weak voices, reduce loud peaks)
-        # - anormalizer: normalize overall levels while preserving dynamic balance
+        # - loudnorm: normalize loudness to perceived level
         filter_graph += f"concat=n={len(batch)}:v=0:a=1[concat];" \
                         "[concat]highpass=f=80:poles=1[hp];" \
                         "[hp]lowpass=f=8000:poles=1[lp];" \
                         "[lp]compand=attacks=0.005:decays=0.1:points=-80/-80|-4.5/-2|-1/-1|0/0:soft-knee=6:gain=4[comp];" \
-                        "[comp]anormalizer=s=0.1[out]"
+                        "[comp]loudnorm=I=-23:TP=-3:LRA=11[out]"
         args.extend(
             [
                 "-filter_complex",
@@ -271,7 +271,7 @@ def convert_and_chunk(
     - High-pass filter: removes low-frequency rumble and hum
     - Low-pass filter: removes high-frequency hiss
     - Compressor: boosts weak voices and reduces dynamic range
-    - Normalizer: optimizes overall levels
+    - Loudness normalization: optimizes levels for consistent perception
     """
     ffmpeg, _ = resolve_ffmpeg(ffmpeg_path)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -280,7 +280,7 @@ def convert_and_chunk(
         "highpass=f=80:poles=1,"
         "lowpass=f=8000:poles=1,"
         "compand=attacks=0.005:decays=0.1:points=-80/-80|-4.5/-2|-1/-1|0/0:soft-knee=6:gain=4,"
-        "anormalizer=s=0.1"
+        "loudnorm=I=-23:TP=-3:LRA=11"
     )
     _run_with_moov_recovery(
         [
