@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Red
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import audio, llm, pipeline, srt
+from . import audio, graph, llm, pipeline, srt
 from .config import Config
 from .jobs import JobQueue
 from .storage import Chunk, Storage
@@ -336,6 +336,18 @@ def create_app(cfg: Config, data_dir: Path) -> FastAPI:
             return JSONResponse({"version": 1, "nodes": [], "edges": []})
         return JSONResponse(json.loads(graph_path.read_text(encoding="utf-8")))
 
+    @app.post("/graph/rebuild")
+    def graph_rebuild():
+        graph_path = storage.recordings_dir.parent / "graph.json"
+        graph.rebuild_from_storage(graph_path, storage)
+        return RedirectResponse("/graph", status_code=303)
+
+    @app.post("/graph/wipe")
+    def graph_wipe():
+        graph_path = storage.recordings_dir.parent / "graph.json"
+        graph.wipe(graph_path)
+        return RedirectResponse("/graph", status_code=303)
+
     @app.get("/graph", response_class=HTMLResponse)
     def graph_view():
         graph_path = storage.recordings_dir.parent / "graph.json"
@@ -399,7 +411,14 @@ def create_app(cfg: Config, data_dir: Path) -> FastAPI:
             "</head><body><header><div class='frame-header'><div><a href='/' class='title-link'><h1>Conversation map</h1></a></div>"
             "<button type='button' class='theme-toggle icon-button theme-fab' data-theme-toggle title='Switch theme' aria-label='Switch theme'></button></div>"
             "<p class='subtitle'>Showing only the strongest continuing conversations.</p></header>"
-            f"<p><a class='button' href='/' title='Go to home'>⌂ Home</a></p>"
+            "<div class='frame-header' style='margin: 0.75rem 0;'>"
+            "<p style='margin:0;'><a class='button' href='/' title='Go to home'>⌂ Home</a></p>"
+            "<div style='display:flex; gap:0.5rem; align-items:center;'>"
+            "<form action='/graph/rebuild' method='post' style='margin:0;'>"
+            "<button type='submit' class='button' title='Rebuild conversation map from all recordings'>↻ Rebuild map</button></form>"
+            "<form action='/graph/wipe' method='post' style='margin:0;' onsubmit=\"return confirm('Are you sure you want to wipe out the conversation map?');\">"
+            "<button type='submit' class='button' style='color: var(--danger, #e5534b);' title='Clear entire conversation map'>🗑 Wipe map</button></form>"
+            "</div></div>"
             f"<main><section class='graph-page'>{content}</section></main>"
             "<script src='/static/app.js?v=20260905b' defer></script></body></html>"
         )
